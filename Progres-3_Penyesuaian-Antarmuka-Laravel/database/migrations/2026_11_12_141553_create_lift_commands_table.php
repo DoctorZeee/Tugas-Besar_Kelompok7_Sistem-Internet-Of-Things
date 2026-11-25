@@ -15,8 +15,9 @@ return new class extends Migration
         $table->id();
         $table->enum('type', ['put_away', 'picking', 'manual']);
         $table->string('item_code')->nullable();
-        $table->integer('target_floor'); // 1, 2, atau 3
+        $table->integer('target_floor'); // 1 atau 2 (firmware: gudang 2 lantai)
         $table->enum('status', ['pending', 'moving', 'done', 'failed'])->default('pending');
+        $table->string('note')->nullable(); // alasan gagal / info dari ESP32
         $table->timestamps();
     });
 }

@@ -13,39 +13,38 @@ Tugas Besar 1 - Sistem Internet of Things
 
 | No | Nama | NIM | Bidang kerja |
 | --- | --- | --- | --- |
-| 1 | Dimas Rafif Zaidan | H1H024043 | IoT penuh: mekanik dan perakitan hardware, firmware ESP32, PID, state machine, klien HTTP |
-| 2 | Huriyatun Nur Anajmi | H1H024035 | Backend: Laravel, database, REST API (command, status, done), validasi, FIFO, autentikasi token |
-| 3 | Lula Khaisha Delavia | H1H024064 | Frontend: antarmuka web, dashboard rak, form put-away/picking, kontrol manual, panel tuning PID, laporan SCM, dokumentasi |
+| 1 | Dimas Rafif Zaidan | H1H024043 | IoT penuh: mekanik dan perakitan hardware, firmware ESP32, PID, state machine, MQTT |
+| 2 | Huriyatun Nur Anajmi | H1H024035 | Backend: Laravel, database, integrasi MQTT, validasi, FIFO, autentikasi |
+| 3 | Lula Khaisha Delavia | H1H024064 | Frontend: antarmuka web, dashboard, form put-away/picking, dokumentasi |
 
 ## Deskripsi Singkat
 
-Prototipe miniatur gudang pintar skala meja: lift satu sumbu dengan kendali posisi PID, rak pasif tiga lantai, dan website Laravel yang mencatat stok serta lokasi barang. Pengguna membuat perintah put-away atau order picking lewat website, ESP32 mengambil perintah melalui REST API, menggerakkan lift ke lantai tujuan dengan umpan balik encoder, lalu melaporkan hasilnya ke Laravel.
+Prototipe miniatur gudang pintar skala meja: lift satu sumbu dengan kendali posisi PID, rak dua lantai, dan website Laravel yang mencatat stok dan lokasi barang. Operator membuat perintah put-away atau picking lewat website; Laravel mengirim nomor lantai ke ESP32 melalui **MQTT (HiveMQ Cloud, TLS)**. ESP32 menggerakkan lift dengan PID dan umpan balik encoder, lalu mengirim telemetri JSON yang ditampilkan real-time di dashboard (Laravel Reverb).
 
-Terdapat dua varian:
+## Struktur Repositori
 
-- **Semi** (target utama): lift otomatis dengan PID, barang diletakkan dan diambil manual di platform.
-- **Full** (jika waktu dan anggaran cukup): ditambah carriage dorong-tarik di platform untuk memasukkan dan menarik kotak dari rak.
-
-## Komponen Utama
-
-- ESP32 DevKit
-- Motor DC gearbox + encoder (JGB37-520, 12 V) dan driver TB6612FNG
-- Limit switch, sensor IR, buck converter LM2596, tombol E-stop + fuse
-- Varian Full: motor carriage, rel carriage, servo SG90, limit switch carriage
-- Laravel + database untuk REST API dan dashboard
-
-## Endpoint API
-
-| Endpoint | Fungsi |
+| Folder | Isi |
 | --- | --- |
-| `GET /api/lift/command` | ESP32 mengecek perintah baru |
-| `POST /api/lift/status` | ESP32 mengirim posisi dan status |
-| `POST /api/lift/done` | ESP32 melaporkan perintah selesai |
+| `Progress-4_SmartWarehouse/` | Firmware ESP32 (Arduino): PID, kalibrasi dua titik, sensor rak HC-SR04, OLED, MQTT |
+| `Progres-5_Laravel-Disesuaikan/` | Web Laravel versi terbaru yang sudah disamakan dengan firmware |
+| `Progres-2_*`, `Progres-3_*` | Arsip versi web sebelumnya (tidak dipakai) |
 
-## Dokumen
+## Komponen Perangkat Keras
+ESP32 DevKit WROOM, driver L298N, motor JGA25 dengan encoder, 2x HC-SR04, OLED SSD1306, tombol UP/DOWN/MODE, tombol E-STOP.
 
-- Progress Tugas Besar 1 (PDF): gambaran umum, daftar komponen, diagram blok, flowchart, mekanisme kerja, dan pembagian kerja.
+## Komunikasi (MQTT)
+
+| Topik | Arah | Isi |
+| --- | --- | --- |
+| `kelompok7/smartwarehouse/lift/command` | Laravel → ESP32 | `1`, `2`, `STOP` |
+| `kelompok7/smartwarehouse/lift/admin/command` | Laravel → ESP32 | `ACK_ERROR` |
+| `kelompok7/smartwarehouse/lift/telemetry` | ESP32 → Laravel | JSON status lift dan rak |
+| `kelompok7/smartwarehouse/lift/admin/result` | ESP32 → Laravel | hasil perintah admin |
+
+## Catatan Operasional
+- Setelah ESP32 menyala, lakukan kalibrasi dua titik di perangkat (MODE x3) sebelum web dapat menggerakkan lift.
+- Kredensial WiFi dan MQTT tidak boleh di-commit; isi lokal saja.
+- Detail firmware: `Progress-4_SmartWarehouse/SmartWarehouse/README.md`. Detail web: `README.md` dan `DEPLOY.md` di folder Laravel.
 
 ## Status
-
-Tahap perancangan sistem selesai; pengerjaan mengikuti urutan pada dokumen progress.
+Firmware dan web sudah terintegrasi lewat MQTT. Tahap berikutnya: uji end-to-end dengan perangkat nyata.

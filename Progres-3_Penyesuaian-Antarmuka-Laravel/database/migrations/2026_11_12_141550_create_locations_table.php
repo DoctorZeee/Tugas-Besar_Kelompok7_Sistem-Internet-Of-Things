@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
             $table->string('location_code')->unique();
             $table->integer('floor');                  
-            $table->integer('target_encoder');        
+            $table->integer('target_encoder')->nullable(); // informasi saja; tick sebenarnya dari kalibrasi di ESP32
             $table->boolean('is_occupied')->default(false);
             $table->timestamps();
         });

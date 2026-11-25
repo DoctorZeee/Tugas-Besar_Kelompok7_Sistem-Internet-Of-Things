@@ -3,8 +3,19 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Location extends Model
 {
-    //
+    protected $fillable = ['location_code', 'floor', 'target_encoder', 'is_occupied'];
+
+    protected function casts(): array
+    {
+        return ['is_occupied' => 'boolean', 'floor' => 'integer', 'target_encoder' => 'integer'];
+    }
+
+    public function items(): HasMany
+    {
+        return $this->hasMany(Item::class);
+    }
 }

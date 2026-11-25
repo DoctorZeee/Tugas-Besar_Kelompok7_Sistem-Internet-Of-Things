@@ -39,7 +39,7 @@ return [
             'port' => env('MQTT_PORT', 1883),
 
             // The MQTT protocol version used for the connection.
-            'protocol' => MqttClient::MQTT_3_1,
+            'protocol' => MqttClient::MQTT_3_1_1,
 
             // A specific client id to be used for the connection. If omitted,
             // a random client id will be generated for each new connection.
@@ -53,7 +53,7 @@ return [
 
             // Whether logging shall be enabled. The default logger will be used
             // with the log level as configured.
-            'enable_logging' => env('MQTT_ENABLE_LOGGING', true),
+            'enable_logging' => env('MQTT_ENABLE_LOGGING', false),
 
             // Which logging channel to use for logs produced by the MQTT client.
             // If left empty, the default log channel or stack is being used.
@@ -109,9 +109,9 @@ return [
 
                 // Additional settings for the optional auto-reconnect. The delay between reconnect attempts is in seconds.
                 'auto_reconnect' => [
-                    'enabled' => env('MQTT_AUTO_RECONNECT_ENABLED', false),
+                    'enabled' => env('MQTT_AUTO_RECONNECT_ENABLED', true),
                     'max_reconnect_attempts' => env('MQTT_AUTO_RECONNECT_MAX_RECONNECT_ATTEMPTS', 3),
-                    'delay_between_reconnect_attempts' => env('MQTT_AUTO_RECONNECT_DELAY_BETWEEN_RECONNECT_ATTEMPTS', 0),
+                    'delay_between_reconnect_attempts' => env('MQTT_AUTO_RECONNECT_DELAY_BETWEEN_RECONNECT_ATTEMPTS', 2),
                 ],
 
             ],

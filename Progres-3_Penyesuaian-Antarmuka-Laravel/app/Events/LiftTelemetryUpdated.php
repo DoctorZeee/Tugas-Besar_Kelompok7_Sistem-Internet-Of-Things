@@ -2,8 +2,8 @@
 
 namespace App\Events;
 
-use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
+use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
@@ -12,18 +12,12 @@ class LiftTelemetryUpdated implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
-    public array $telemetry;
+    public function __construct(public array $telemetry) {}
 
-    public function __construct(array $telemetry)
-    {
-        $this->telemetry =$telemetry;
-    }
-
+    /** Channel privat: hanya pengguna yang sudah login yang boleh mendengarkan (lihat routes/channels.php). */
     public function broadcastOn(): array
     {
-        return [
-            new Channel('warehouse-telemetry'),
-        ];
+        return [new PrivateChannel('warehouse-telemetry')];
     }
 
     public function broadcastAs(): string

@@ -13,6 +13,10 @@ return new class extends Migration
     {
         Schema::create('stock_movements', function (Blueprint $table) {
             $table->id();
+            $table->foreignId('item_id')->constrained('items');
+            $table->foreignId('location_id')->nullable()->constrained('locations');
+            $table->enum('type', ['in', 'out']);
+            $table->integer('quantity');
             $table->timestamps();
         });
     }

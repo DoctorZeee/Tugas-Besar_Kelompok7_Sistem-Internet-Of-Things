@@ -5,96 +5,175 @@ namespace App\Console\Commands;
 use App\Events\LiftTelemetryUpdated;
 use App\Models\AnomalyLog;
 use App\Models\LiftCommand;
+use App\Services\LiftService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use PhpMqtt\Client\Facades\MQTT;
+use Throwable;
 
 class MqttTelemetryListener extends Command
 {
     protected $signature = 'mqtt:listen';
-    protected $description = 'Mendengarkan data telemetri ESP32 dari MQTT dan meneruskan ke WebSocket';
+    protected $description = 'Mendengarkan telemetri ESP32 dari MQTT, memperbarui status perintah, dan meneruskan ke dashboard (Reverb)';
 
-    public function handle(): void
+    public function handle(): int
     {
-        $this->info('Menghubungkan ke MQTT Broker untuk mendengarkan topic/lift/telemetry...');
+        $this->info('Listener MQTT dimulai. Topik: ' . config('warehouse.topics.telemetry'));
 
-        $mqtt = MQTT::connection();
+        // Jalankan di bawah supervisor. Bila koneksi putus, sambung ulang sendiri.
+        while (true) {
+            try {
+                $mqtt = MQTT::connection();
 
-        $mqtt->subscribe('topic/lift/telemetry', function (string $topic, string $message) {
-            $data = json_decode($message, true);
+                $mqtt->subscribe(config('warehouse.topics.telemetry'), function (string $topic, string $message) {
+                    $this->onTelemetry($message);
+                }, 0);
 
-            if (!is_array($data)) {
-                $this->warn("Payload JSON tidak valid: {$message}");
+                $mqtt->subscribe(config('warehouse.topics.admin_result'), function (string $topic, string $message) {
+                    Log::info('[lift admin/result] ' . $message);
+                    $this->line("[ADMIN] {$message}");
+                }, 0);
+
+                $this->info('Tersambung ke broker.');
+                $mqtt->loop(true);
+            } catch (Throwable $e) {
+                report($e);
+                $this->error('Koneksi MQTT terputus: ' . $e->getMessage() . ' (coba lagi 5 detik)');
+                try {
+                    MQTT::disconnect();
+                } catch (Throwable) {
+                    // abaikan
+                }
+                sleep(5);
+            }
+        }
+    }
+
+    private function onTelemetry(string $message): void
+    {
+        $data = json_decode($message, true);
+        if (! is_array($data)) {
+            $this->warn("Payload JSON tidak valid: {$message}");
+
+            return;
+        }
+
+        $t = [
+            'state'           => (string) ($data['state'] ?? 'UNKNOWN'),
+            'floor'           => (int) ($data['floor'] ?? 0),
+            'ticks'           => (int) ($data['ticks'] ?? 0),
+            'target'          => (int) ($data['target'] ?? 0),
+            'dist1'           => (float) ($data['dist1'] ?? -1),
+            'dist2'           => (float) ($data['dist2'] ?? -1),
+            'rack1_status'    => (string) ($data['rack1_status'] ?? 'UNKNOWN'),
+            'rack2_status'    => (string) ($data['rack2_status'] ?? 'UNKNOWN'),
+            'rack1_near_full' => (bool) ($data['rack1_near_full'] ?? false),
+            'rack2_near_full' => (bool) ($data['rack2_near_full'] ?? false),
+            'estop'           => (bool) ($data['estop'] ?? false),
+            'homed'           => (bool) ($data['homed'] ?? false),
+            'position_valid'  => (bool) ($data['position_valid'] ?? false),
+            'ready_to_move'   => (bool) ($data['ready_to_move'] ?? false),
+            'floor2_ticks'    => (int) ($data['floor2_ticks'] ?? 0),
+            'fault'           => (string) ($data['fault'] ?? ''),
+            'info'            => (string) ($data['info'] ?? ''),
+            'received_at'     => now()->timestamp,
+        ];
+
+        Cache::put(LiftService::TELEMETRY_KEY, $t, now()->addMinutes(10));
+
+        $this->updateCommandState($t);
+
+        $t['is_locked'] = Cache::get(LiftService::LOCK_KEY) === 'LIFT_MOVING';
+        $t['timestamp'] = now()->format('H:i:s');
+        unset($t['received_at']);
+
+        try {
+            broadcast(new LiftTelemetryUpdated($t));
+        } catch (Throwable $e) {
+            // Reverb mati tidak boleh menghentikan pencatatan status perintah.
+            report($e);
+        }
+
+        $this->line("[{$t['state']}] Lantai: {$t['floor']} | Ticks: {$t['ticks']}/{$t['target']} | Info: {$t['info']}");
+    }
+
+    private function updateCommandState(array $t): void
+    {
+        $state  = $t['state'];
+        $active = Cache::get(LiftService::ACTIVE_KEY);
+
+        if (in_array($state, ['MOVING', 'MANUAL'], true)) {
+            if ($active) {
+                $active['seen_moving'] = true;
+                Cache::put(LiftService::ACTIVE_KEY, $active, now()->addSeconds(config('warehouse.lock_seconds')));
+            }
+            Cache::put(LiftService::LOCK_KEY, 'LIFT_MOVING', now()->addSeconds(config('warehouse.lock_seconds')));
+
+            return;
+        }
+
+        if (in_array($state, ['IDLE', 'ARRIVED'], true)) {
+            if (! $active) {
+                Cache::forget(LiftService::LOCK_KEY);
+
                 return;
             }
 
-            // Key sesuai JSON dari ESP32: state, floor, ticks, target, dist1, dist2, estop, homed, info
-            $state     = $data['state'] ?? 'UNKNOWN';
-            $floor     = (int) ($data['floor'] ?? 1);
-            $ticks     = (int) ($data['ticks'] ?? 0);
-            $target    = (int) ($data['target'] ?? 0);
-            $dist1     = (float) ($data['dist1'] ?? -1);
-            $dist2     = (float) ($data['dist2'] ?? -1);
-            $estop     = (bool) ($data['estop'] ?? false);
-            $homed     = (bool) ($data['homed'] ?? false);
-            $info      = (string) ($data['info'] ?? '');
-            $commandId = Cache::get('active_command_id');
+            $age = now()->timestamp - (int) $active['at'];
+            $atTarget = $t['floor'] === (int) $active['floor'];
 
-            // 1. Jika lift selesai bergerak (IDLE / ARRIVED)
-            if (in_array($state, ['IDLE', 'ARRIVED'])) {
-                Cache::forget('lift_status');
-                if ($commandId) {
-                    LiftCommand::where('id', $commandId)->update(['status' => 'completed']);
-                    Cache::forget('active_command_id');
-                }
+            if ($atTarget && ($active['seen_moving'] || $age >= config('warehouse.settle_seconds'))) {
+                LiftCommand::where('id', $active['id'])->update(['status' => 'done']);
+                $this->releaseLock();
+            } elseif (! $atTarget && ($active['seen_moving'] || $age >= config('warehouse.reject_seconds'))) {
+                // Lift berhenti di luar target (STOP / ditolak firmware): jangan dianggap sukses.
+                LiftCommand::where('id', $active['id'])->update([
+                    'status' => 'failed',
+                    'note'   => mb_substr('Lift berhenti di lantai ' . $t['floor'] . ($t['info'] ? " ({$t['info']})" : ''), 0, 250),
+                ]);
+                $this->releaseLock();
             }
 
-            // 2. Jika lift sedang bergerak / homing / manual
-            if (in_array($state, ['MOVING', 'HOMING', 'MANUAL'])) {
-                Cache::put('lift_status', 'LIFT_MOVING', now()->addSeconds(10));
-            }
+            return;
+        }
 
-            // 3. Deteksi Anomali Keselamatan (ESTOP atau ERROR seperti MOTION_TIMEOUT / TOP_SOFT_LIMIT)
-            if (in_array($state, ['ESTOP', 'ERROR'])) {
-                Cache::forget('lift_status');
+        // ESTOP / ERROR / OFFLINE / POSITION_UNREFERENCED / BOOT: perintah aktif pasti gagal.
+        if ($active) {
+            LiftCommand::where('id', $active['id'])->update([
+                'status' => 'failed',
+                'note'   => mb_substr("State {$state}" . ($t['fault'] ? " ({$t['fault']})" : ''), 0, 250),
+            ]);
+        }
+        $this->releaseLock();
 
-                if ($commandId) {
-                    LiftCommand::where('id', $commandId)->update(['status' => 'failed']);
-                    Cache::forget('active_command_id');
-                }
+        if (in_array($state, ['ESTOP', 'ERROR'], true)) {
+            $this->logAnomaly($t);
+        }
+    }
 
-                // Hindari spam log berulang untuk info error yang sama
-                $cacheErrorKey = "last_anomaly_{$state}_{$info}";
-                if (!Cache::has($cacheErrorKey)) {
-                    AnomalyLog::create([
-                        'type'        => strtolower($state),
-                        'description' => "State {$state} pada ticks {$ticks}" . ($info ? " (Info: {$info})" : ''),
-                        'current_amp' => 0,
-                    ]);
-                    Cache::put($cacheErrorKey, true, now()->addSeconds(10));
-                }
+    private function releaseLock(): void
+    {
+        Cache::forget(LiftService::LOCK_KEY);
+        Cache::forget(LiftService::ACTIVE_KEY);
+    }
 
-                $this->error("[ANOMALI] {$state} | Ticks: {$ticks} | Info: {$info}");
-            }
+    private function logAnomaly(array $t): void
+    {
+        $key = "last_anomaly_{$t['state']}_{$t['fault']}";
+        if (Cache::has($key)) {
+            return; // hindari spam log untuk fault yang sama
+        }
+        Cache::put($key, true, now()->addSeconds(30));
 
-            // 4. Siarkan data ke Dashboard Digital Twin via Laravel Reverb
-            broadcast(new LiftTelemetryUpdated([
-                'state'     => $state,
-                'floor'     => $floor,
-                'ticks'     => $ticks,
-                'target'    => $target,
-                'dist1'     => $dist1,
-                'dist2'     => $dist2,
-                'estop'     => $estop,
-                'homed'     => $homed,
-                'info'      => $info,
-                'is_locked' => Cache::get('lift_status') === 'LIFT_MOVING',
-                'timestamp' => now()->format('H:i:s'),
-            ]));
+        AnomalyLog::create([
+            'event_type'       => strtolower($t['state']),
+            'encoder_position' => $t['ticks'],
+            'description'      => "State {$t['state']} pada ticks {$t['ticks']}"
+                . ($t['fault'] ? " (Fault: {$t['fault']})" : '')
+                . ($t['info'] ? " (Info: {$t['info']})" : ''),
+        ]);
 
-            $this->line("[{$state}] Lantai: {$floor} | Ticks: {$ticks}/{$target} | D1: {$dist1}cm | D2: {$dist2}cm | Info: {$info}");
-        }, 0);
-
-        $mqtt->loop(true);
+        $this->error("[ANOMALI] {$t['state']} | Ticks: {$t['ticks']} | Fault: {$t['fault']}");
     }
 }

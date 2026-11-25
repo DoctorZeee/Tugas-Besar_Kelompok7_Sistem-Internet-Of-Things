@@ -3,23 +3,34 @@
 namespace Database\Seeders;
 
 use App\Models\User;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
 class DatabaseSeeder extends Seeder
 {
-    use WithoutModelEvents;
-
-    /**
-     * Seed the application's database.
-     */
     public function run(): void
     {
-        // User::factory(10)->create();
+        $this->call(LocationSeeder::class);
 
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-        ]);
+        // Akun dari .env. Tidak ada password bawaan.
+        $this->makeUser('ADMIN', 'admin', 'Admin');
+        $this->makeUser('OPERATOR', 'operator', 'Operator');
+    }
+
+    private function makeUser(string $prefix, string $role, string $defaultName): void
+    {
+        $email = env("{$prefix}_EMAIL");
+        $password = env("{$prefix}_PASSWORD");
+
+        if (! $email || ! $password) {
+            $this->command?->warn("{$prefix}_EMAIL / {$prefix}_PASSWORD belum diisi di .env: akun {$role} tidak dibuat.");
+
+            return;
+        }
+
+        $user = User::updateOrCreate(
+            ['email' => $email],
+            ['name' => env("{$prefix}_NAME", $defaultName), 'password' => $password],
+        );
+        $user->forceFill(['role' => $role])->save(); // role sengaja tidak mass-assignable
     }
 }
