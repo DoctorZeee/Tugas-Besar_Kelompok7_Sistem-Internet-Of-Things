@@ -7,161 +7,187 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
-<body class="bg-slate-950 text-slate-100 font-sans antialiased">
-    <div class="max-w-7xl mx-auto p-6 space-y-6">
+<body class="dashboard">
+    <div class="container">
         <!-- Header -->
-        <header class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
-            <div>
-                <h1 class="text-2xl font-bold tracking-tight text-emerald-400">Smart Warehouse AS/RS</h1>
-                <p class="text-sm text-slate-400">Digital Twin Telemetry, Locking Control & FIFO Inventory</p>
+        <header class="topbar">
+            <div class="brand">
+                <h1 class="brand__title">Smart Warehouse AS/RS</h1>
+                <p class="brand__subtitle">Digital Twin Telemetry, Locking Control &amp; FIFO Inventory</p>
             </div>
-            <div class="flex flex-wrap items-center gap-2">
-                <span id="badge-homed" class="px-3 py-1 rounded-full text-xs font-semibold bg-slate-800 text-slate-300 border border-slate-700">
-                    HOMED: UNKNOWN
-                </span>
-                <span id="badge-ready" class="px-3 py-1 rounded-full text-xs font-semibold bg-slate-800 text-slate-300 border border-slate-700">
-                    SIAP: -
-                </span>
-                <span id="badge-status" class="px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
-                    STATE: IDLE
-                </span>
-                <button onclick="sendLiftCommand('STOP')" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-600 hover:bg-amber-500 text-white transition">
-                    STOP
-                </button>
-                @can('lift-admin')
-                <button onclick="ackError()" title="Hapus status fault di ESP32. Kalibrasi MODE x3 tetap wajib di perangkat." class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-600 hover:bg-rose-500 text-white transition">
-                    ACK Error
-                </button>
-                @endcan
-                <form method="POST" action="{{ route('logout') }}">
-                    @csrf
-                    <button type="submit" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 transition">Keluar</button>
-                </form>
+            <div class="topbar__right">
+                <div class="pill-group">
+                    <span id="badge-homed" class="pill" data-tone="muted">POSISI: -</span>
+                    <span id="badge-ready" class="pill" data-tone="muted">SIAP: -</span>
+                    <span id="badge-status" class="pill" data-tone="muted">STATE: -</span>
+                </div>
+                <div class="action-group">
+                    <button onclick="sendLiftCommand('STOP')" class="btn btn--warn">■ STOP</button>
+                    @can('lift-admin')
+                    <button onclick="ackError()" title="Hapus status fault di ESP32. Kalibrasi MODE x3 tetap wajib di perangkat." class="btn btn--danger">ACK Error</button>
+                    @endcan
+                    <form method="POST" action="{{ route('logout') }}">
+                        @csrf
+                        <button type="submit" class="btn btn--ghost">Keluar</button>
+                    </form>
+                </div>
             </div>
         </header>
 
-        <!-- Alert Info dari ESP32 -->
-        <div id="info-banner" class="hidden px-4 py-2.5 rounded-lg bg-rose-500/15 border border-rose-500/40 text-rose-300 text-xs font-medium"></div>
+        <!-- Alert info dari ESP32 -->
+        <div id="info-banner" class="alert" data-tone="warn" role="status" hidden></div>
 
-        <!-- Grid Utama -->
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <!-- Kolom 1: Visualisasi Digital Twin Lift -->
-            <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 flex flex-col justify-between">
-                <div>
-                    <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-4">Digital Twin Lift (Encoder)</h2>
-                    
-                    <!-- Shaft Lift Visual (2 lantai; tick Lantai 2 dari kalibrasi di ESP32) -->
-                    <div class="relative h-64 bg-slate-950 border border-slate-800 rounded-lg p-4 flex flex-col justify-between overflow-hidden">
-                        <div class="flex justify-between items-center border-b border-dashed border-slate-800 pb-2 text-xs text-slate-400">
-                            <span>Lantai 2 (R1-L2-S1)</span>
-                            <span id="label-floor2">belum terkalibrasi</span>
-                        </div>
-                        <div class="flex justify-between items-center text-xs text-slate-400">
-                            <span>Lantai 1 (R1-L1-S1)</span>
-                            <span>0 ticks</span>
-                        </div>
+        <!-- Grid utama -->
+        <main class="grid">
+            <!-- Kartu 1: Digital twin lift -->
+            <section class="card">
+                <h2 class="card__title">Digital Twin Lift</h2>
 
-                        <!-- Kereta Lift Bergerak -->
-                        <div id="lift-carriage" style="bottom: 8px;" class="absolute left-1/2 -translate-x-1/2 w-40 h-11 bg-emerald-500/20 border-2 border-emerald-400 rounded-md flex flex-col items-center justify-center text-xs font-bold text-emerald-300 transition-all duration-300 shadow-lg shadow-emerald-500/10">
-                            <span id="carriage-floor">LANTAI 1</span>
+                <div id="shaft" class="shaft" role="img" aria-label="Posisi lift pada poros dua lantai">
+                    <div class="shaft__label shaft__label--top">
+                        <span class="shaft__floor">Lantai 2</span>
+                        <span class="shaft__code mono">R1-L2-S1</span>
+                        <span id="label-floor2" class="shaft__ticks">belum terkalibrasi</span>
+                    </div>
+                    <div class="shaft__label shaft__label--bottom">
+                        <span class="shaft__floor">Lantai 1</span>
+                        <span class="shaft__code mono">R1-L1-S1</span>
+                        <span class="shaft__ticks">0 ticks</span>
+                    </div>
+
+                    <div class="shaft__track">
+                        <div class="shaft__rail"></div>
+                        <div class="shaft__line shaft__line--top"></div>
+                        <div class="shaft__line shaft__line--bottom"></div>
+                        <div id="lift-carriage" class="carriage" data-tone="muted">
+                            <span id="carriage-floor">MENUNGGU DATA</span>
                         </div>
                     </div>
                 </div>
 
-                <!-- Metrik Telemetri -->
-                <div class="grid grid-cols-3 gap-2.5 mt-4">
-                    <div class="bg-slate-950 border border-slate-800 rounded-lg p-3">
-                        <p class="text-[11px] text-slate-400">Encoder</p>
-                        <p id="val-ticks" class="text-lg font-bold text-white mt-1">0 <span class="text-[11px] font-normal text-slate-500">ticks</span></p>
+                <div class="metrics">
+                    <div class="metric">
+                        <p class="metric__label">Encoder</p>
+                        <p id="val-ticks" class="metric__value">0<span class="metric__unit">ticks</span></p>
                     </div>
-                    <div class="bg-slate-950 border border-slate-800 rounded-lg p-3">
-                        <p class="text-[11px] text-slate-400">Sensor Lt. 1</p>
-                        <p id="val-dist1" class="text-lg font-bold text-sky-400 mt-1">- <span class="text-[11px] font-normal text-slate-500">cm</span></p>
+                    <div class="metric">
+                        <p class="metric__label">Sensor Lt. 1</p>
+                        <p id="val-dist1" class="metric__value metric__value--info">-<span class="metric__unit">cm</span></p>
                     </div>
-                    <div class="bg-slate-950 border border-slate-800 rounded-lg p-3">
-                        <p class="text-[11px] text-slate-400">Sensor Lt. 2</p>
-                        <p id="val-dist2" class="text-lg font-bold text-sky-400 mt-1">- <span class="text-[11px] font-normal text-slate-500">cm</span></p>
+                    <div class="metric">
+                        <p class="metric__label">Sensor Lt. 2</p>
+                        <p id="val-dist2" class="metric__value metric__value--info">-<span class="metric__unit">cm</span></p>
                     </div>
                 </div>
-            </div>
+            </section>
 
-            <!-- Kolom 2: Kontrol Gerak & Form Put Away / Picking -->
-            <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-5">
+            <!-- Kartu 2: Kontrol manual, put away, picking -->
+            <section class="card">
                 @can('lift-admin')
-                <div>
-                    <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-3">Kontrol Manual Rak</h2>
-                    <div class="grid grid-cols-2 gap-2">
-                        <button onclick="sendLiftCommand('MANUAL', 'R1-L1-S1')" class="py-2.5 px-3 bg-slate-800 hover:bg-emerald-600 rounded-lg text-xs font-semibold transition">Lantai 1</button>
-                        <button onclick="sendLiftCommand('MANUAL', 'R1-L2-S1')" class="py-2.5 px-3 bg-slate-800 hover:bg-emerald-600 rounded-lg text-xs font-semibold transition">Lantai 2</button>
+                <div class="section">
+                    <h2 class="card__title">Kontrol Manual Rak</h2>
+                    <p class="section__hint">Gerakkan lift tanpa mencatat stok (khusus admin).</p>
+                    <div class="floor-buttons">
+                        <button onclick="sendLiftCommand('MANUAL', 'R1-L1-S1')" class="floor-btn">
+                            <span class="floor-btn__name">Lantai 1</span>
+                            <span class="floor-btn__code mono">R1-L1-S1</span>
+                        </button>
+                        <button onclick="sendLiftCommand('MANUAL', 'R1-L2-S1')" class="floor-btn">
+                            <span class="floor-btn__name">Lantai 2</span>
+                            <span class="floor-btn__code mono">R1-L2-S1</span>
+                        </button>
                     </div>
                 </div>
 
-                <hr class="border-slate-800">
+                <hr class="divider">
                 @endcan
 
-                <!-- Form Put Away (Barang Masuk) -->
-                <form onsubmit="handlePutAway(event)" class="space-y-3">
-                    <h3 class="text-sm font-semibold text-emerald-400">Barang Masuk (Put Away)</h3>
-                    <div class="grid grid-cols-2 gap-2">
-                        <input id="in-code" type="text" placeholder="Kode (mis. BRG-01)" required class="bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs">
-                        <input id="in-name" type="text" placeholder="Nama Barang" required class="bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs">
+                <!-- Put away (barang masuk) -->
+                <form onsubmit="handlePutAway(event)" class="section">
+                    <h3 class="section__title section__title--ok">Barang Masuk (Put Away)</h3>
+                    <div class="form-grid">
+                        <div class="field">
+                            <label class="field__label" for="in-code">Kode barang</label>
+                            <input id="in-code" class="field__input" type="text" placeholder="mis. BRG-01" autocomplete="off" required>
+                        </div>
+                        <div class="field">
+                            <label class="field__label" for="in-name">Nama barang</label>
+                            <input id="in-name" class="field__input" type="text" placeholder="mis. Kardus" autocomplete="off" required>
+                        </div>
+                        <div class="field">
+                            <label class="field__label" for="in-qty">Jumlah masuk</label>
+                            <input id="in-qty" class="field__input" type="number" placeholder="0" min="1" required>
+                        </div>
+                        <div class="field">
+                            <label class="field__label" for="in-min">Batas minimum (ROP)</label>
+                            <input id="in-min" class="field__input" type="number" value="5" min="1">
+                        </div>
                     </div>
-                    <div class="grid grid-cols-2 gap-2">
-                        <input id="in-qty" type="number" placeholder="Jumlah" min="1" required class="bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs">
-                        <input id="in-min" type="number" placeholder="Min Stok (ROP)" value="5" min="1" class="bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs">
-                    </div>
-                    <button type="submit" class="w-full py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-xs font-semibold transition">
-                        Simpan & Kirim Lift ke Rak Kosong
-                    </button>
+                    <button type="submit" class="btn btn--primary btn--block">Simpan &amp; Kirim Lift ke Rak Kosong</button>
                 </form>
 
-                <hr class="border-slate-800">
+                <hr class="divider">
 
-                <!-- Form Picking (Barang Keluar FIFO) -->
-                <form onsubmit="handlePicking(event)" class="space-y-3">
-                    <h3 class="text-sm font-semibold text-sky-400">Barang Keluar (Picking FIFO)</h3>
-                    <div class="grid grid-cols-2 gap-2">
-                        <input id="out-name" type="text" placeholder="Nama Barang" required class="bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs">
-                        <input id="out-qty" type="number" placeholder="Jumlah Ambil" min="1" required class="bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs">
+                <!-- Picking (barang keluar FIFO) -->
+                <form onsubmit="handlePicking(event)" class="section">
+                    <h3 class="section__title section__title--info">Barang Keluar (Picking FIFO)</h3>
+                    <div class="form-grid">
+                        <div class="field">
+                            <label class="field__label" for="out-name">Nama barang</label>
+                            <input id="out-name" class="field__input" type="text" placeholder="mis. Kardus" autocomplete="off" required>
+                        </div>
+                        <div class="field">
+                            <label class="field__label" for="out-qty">Jumlah diambil</label>
+                            <input id="out-qty" class="field__input" type="number" placeholder="0" min="1" required>
+                        </div>
                     </div>
-                    <button type="submit" class="w-full py-2 bg-sky-600 hover:bg-sky-500 rounded-lg text-xs font-semibold transition">
-                        Ambil Stok Terlama (FIFO)
-                    </button>
+                    <button type="submit" class="btn btn--info btn--block">Ambil Stok Terlama (FIFO)</button>
                 </form>
-            </div>
+            </section>
 
-            <!-- Kolom 3: Daftar Stok FIFO & Peringatan ROP -->
-            <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 flex flex-col">
-                <div class="flex items-center justify-between mb-4">
-                    <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-400">Inventaris (Urutan FIFO)</h2>
-                    <button onclick="loadInventory()" class="text-xs text-emerald-400 hover:underline">Refresh</button>
+            <!-- Kartu 3: Inventaris -->
+            <section class="card card--wide">
+                <div class="card__head">
+                    <h2 class="card__title">Inventaris (Urutan FIFO)</h2>
+                    <button onclick="loadInventory()" class="link-btn">Refresh</button>
                 </div>
-                <div class="overflow-x-auto flex-1">
-                    <table class="w-full text-left text-xs">
-                        <thead class="text-slate-400 border-b border-slate-800">
+                <div class="table-wrap">
+                    <table class="table">
+                        <thead>
                             <tr>
-                                <th class="pb-2">Kode</th>
-                                <th class="pb-2">Barang</th>
-                                <th class="pb-2">Rak</th>
-                                <th class="pb-2">Stok</th>
-                                <th class="pb-2">Status</th>
+                                <th>Kode</th>
+                                <th>Barang</th>
+                                <th>Rak</th>
+                                <th class="table__num">Stok</th>
+                                <th>Status</th>
                             </tr>
                         </thead>
-                        <tbody id="inventory-body" class="divide-y divide-slate-800/60">
-                            <tr><td colspan="5" class="py-4 text-center text-slate-500">Memuat data...</td></tr>
+                        <tbody id="inventory-body">
+                            <tr><td colspan="5" class="table__empty">Memuat data...</td></tr>
                         </tbody>
                     </table>
                 </div>
-            </div>
-        </div>
+            </section>
+        </main>
     </div>
+
+    <div id="toasts" class="toasts" aria-live="polite"></div>
 
     <script>
         const csrf = document.querySelector('meta[name="csrf-token"]').content;
         let floor2Ticks = 0;
 
         const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-        const BADGE = 'px-3 py-1 rounded-full text-xs font-semibold border ';
+        const unit = (u) => `<span class="metric__unit">${u}</span>`;
+
+        function toast(message, tone = 'info') {
+            const el = document.createElement('div');
+            el.className = 'toast';
+            el.dataset.tone = tone;
+            el.textContent = message;
+            document.getElementById('toasts').append(el);
+            setTimeout(() => el.remove(), 5000);
+        }
 
         async function api(method, url, body) {
             const res = await fetch(url, {
@@ -184,48 +210,48 @@
             return { ok: res.ok, status: res.status, json };
         }
 
+        function setPill(id, text, tone) {
+            const el = document.getElementById(id);
+            el.textContent = text;
+            el.dataset.tone = tone;
+        }
+
         function setCm(id, v) {
-            document.getElementById(id).innerHTML = (v !== undefined && v >= 0)
-                ? `${Number(v).toFixed(1)} <span class="text-[11px] font-normal text-slate-500">cm</span>`
-                : `- <span class="text-[11px] font-normal text-slate-500">cm</span>`;
+            const value = (v !== undefined && v >= 0) ? Number(v).toFixed(1) : '-';
+            document.getElementById(id).innerHTML = value + unit('cm');
         }
 
         function updateTelemetryUI(d) {
             const offline = d.state === 'OFFLINE' || d.state === undefined;
-            document.getElementById('val-ticks').innerHTML = `${d.ticks ?? 0} <span class="text-[11px] font-normal text-slate-500">ticks</span>`;
+            const fatal = ['ESTOP', 'ERROR'].includes(d.state);
+            const busy = ['MOVING', 'MANUAL'].includes(d.state) || d.is_locked;
+
+            document.getElementById('val-ticks').innerHTML = (d.ticks ?? 0) + unit('ticks');
             setCm('val-dist1', d.dist1);
             setCm('val-dist2', d.dist2);
 
             if (d.floor2_ticks > 0) floor2Ticks = d.floor2_ticks;
             document.getElementById('label-floor2').textContent = floor2Ticks > 0 ? `${floor2Ticks} ticks` : 'belum terkalibrasi';
 
+            const carriage = document.getElementById('lift-carriage');
             document.getElementById('carriage-floor').textContent =
-                offline ? 'OFFLINE' : (d.floor > 0 ? `LANTAI ${d.floor}` : 'ANTAR LANTAI / BELUM REF.');
+                offline ? 'OFFLINE'
+                : d.floor > 0 ? `LANTAI ${d.floor}`
+                : d.position_valid ? 'ANTAR LANTAI' : 'BELUM REFERENSI';
+            carriage.dataset.tone = offline ? 'muted' : fatal ? 'danger' : busy ? 'warn' : 'ok';
 
             const ratio = floor2Ticks > 0 ? Math.min(Math.max((d.ticks ?? 0) / floor2Ticks, 0), 1) : 0;
-            document.getElementById('lift-carriage').style.bottom = `${8 + ratio * 188}px`;
+            document.getElementById('shaft').style.setProperty('--pos', ratio);
 
-            const homed = document.getElementById('badge-homed');
-            homed.textContent = d.position_valid ? 'POSISI: VALID' : 'POSISI: BELUM REFERENSI';
-            homed.className = BADGE + (d.position_valid
-                ? 'bg-sky-500/20 text-sky-300 border-sky-500/40'
-                : 'bg-amber-500/20 text-amber-300 border-amber-500/40');
-
-            const ready = document.getElementById('badge-ready');
-            ready.textContent = d.ready_to_move ? 'SIAP GERAK' : 'BELUM SIAP';
-            ready.className = BADGE + (d.ready_to_move
-                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                : 'bg-slate-800 text-slate-300 border-slate-700');
-
-            const badge = document.getElementById('badge-status');
-            badge.textContent = `STATE: ${d.state ?? 'OFFLINE'}`;
-            if (['ESTOP', 'ERROR', 'OFFLINE'].includes(d.state) || offline) {
-                badge.className = BADGE + 'bg-rose-500/20 text-rose-300 border-rose-500/40';
-            } else if (['MOVING', 'MANUAL'].includes(d.state) || d.is_locked) {
-                badge.className = BADGE + 'bg-amber-500/20 text-amber-300 border-amber-500/40';
-            } else {
-                badge.className = BADGE + 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40';
-            }
+            setPill('badge-homed',
+                d.position_valid ? 'POSISI: VALID' : 'POSISI: BELUM REFERENSI',
+                d.position_valid ? 'info' : 'warn');
+            setPill('badge-ready',
+                d.ready_to_move ? 'SIAP GERAK' : 'BELUM SIAP',
+                d.ready_to_move ? 'ok' : 'muted');
+            setPill('badge-status',
+                `STATE: ${d.state ?? 'OFFLINE'}`,
+                (offline || fatal) ? 'danger' : busy ? 'warn' : 'ok');
 
             const msgs = [];
             if (d.fault) msgs.push(`Fault: ${d.fault}`);
@@ -233,20 +259,26 @@
             if (d.rack1_near_full) msgs.push('Rak Lantai 1 hampir penuh');
             if (d.rack2_near_full) msgs.push('Rak Lantai 2 hampir penuh');
             if (!offline && !d.position_valid) msgs.push('Kalibrasi MODE x3 di perangkat diperlukan setiap kali ESP32 restart.');
+
             const banner = document.getElementById('info-banner');
-            banner.textContent = msgs.join(' • ');
-            banner.classList.toggle('hidden', msgs.length === 0);
+            banner.dataset.tone = (d.fault || fatal || offline) ? 'danger' : 'warn';
+            banner.replaceChildren(
+                Object.assign(document.createElement('span'), { className: 'alert__icon', textContent: '!' }),
+                ...msgs.map((m) => Object.assign(document.createElement('span'), { className: 'alert__item', textContent: m })),
+            );
+            banner.hidden = msgs.length === 0;
         }
 
         async function sendLiftCommand(action, targetRack = null) {
             const r = await api('POST', '/lift/command', { action, target_rack: targetRack });
-            if (!r.ok) alert(r.json.message || 'Perintah ditolak!');
+            if (r.ok) toast(r.json.message || 'Perintah terkirim', 'ok');
+            else toast(r.json.message || 'Perintah ditolak!', 'danger');
         }
 
         async function ackError() {
             if (!confirm('Kirim ACK_ERROR? Pastikan lift sudah dicek secara fisik. Kalibrasi MODE x3 tetap wajib di perangkat.')) return;
             const r = await api('POST', '/lift/ack-error');
-            alert(r.json.message || 'Selesai');
+            toast(r.json.message || 'Selesai', r.ok ? 'warn' : 'danger');
         }
 
         async function handlePutAway(e) {
@@ -261,9 +293,9 @@
             if (r.ok) {
                 e.target.reset();
                 document.getElementById('in-min').value = 5;
-                alert(r.json.message);
+                toast(r.json.message, 'ok');
             } else {
-                alert(r.json.message || 'Gagal menyimpan barang');
+                toast(r.json.message || 'Gagal menyimpan barang', 'danger');
             }
             loadInventory();
         }
@@ -277,11 +309,18 @@
             const r = await api('POST', '/inventory/picking', payload);
             if (r.ok) {
                 e.target.reset();
-                alert(r.json.message + (r.json.rop_warning ? `\nPeringatan ROP: stok ${payload.item_name} mencapai batas minimum!` : ''));
+                const rop = r.json.rop_warning ? `\nPeringatan ROP: stok ${payload.item_name} mencapai batas minimum!` : '';
+                toast(r.json.message + rop, r.json.rop_warning ? 'warn' : 'ok');
             } else {
-                alert(r.json.message || 'Stok tidak mencukupi');
+                toast(r.json.message || 'Stok tidak mencukupi', 'danger');
             }
             loadInventory();
+        }
+
+        function stockStatus(item) {
+            if (item.quantity <= 0) return ['HABIS', 'danger'];
+            if (item.is_low_stock) return ['ROP ALERT', 'warn'];
+            return ['AMAN', 'ok'];
         }
 
         async function loadInventory() {
@@ -289,22 +328,23 @@
             const tbody = document.getElementById('inventory-body');
             const items = Array.isArray(r.json) ? r.json : [];
             if (!items.length) {
-                tbody.innerHTML = '<tr><td colspan="5" class="py-4 text-center text-slate-500">Belum ada barang di rak.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="5" class="table__empty">Belum ada barang di rak.</td></tr>';
                 return;
             }
-            tbody.innerHTML = items.map(item => `
-                <tr>
-                    <td class="py-2.5 font-mono text-slate-300">${esc(item.item_code)}</td>
-                    <td class="py-2.5">${esc(item.item_name)}</td>
-                    <td class="py-2.5 text-emerald-400">${item.location ? esc(item.location.location_code) : '-'}</td>
-                    <td class="py-2.5 font-semibold">${esc(item.quantity)}</td>
-                    <td class="py-2.5">
-                        ${item.is_low_stock
-                            ? '<span class="px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 text-[10px]">ROP ALERT</span>'
-                            : '<span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 text-[10px]">AMAN</span>'}
-                    </td>
-                </tr>
-            `).join('');
+            tbody.innerHTML = items.map((item) => {
+                const [label, tone] = stockStatus(item);
+                const rack = item.location
+                    ? `<span class="chip mono" data-tone="ok">${esc(item.location.location_code)}</span>`
+                    : '<span class="chip" data-tone="muted">—</span>';
+                return `
+                    <tr>
+                        <td class="table__code mono">${esc(item.item_code)}</td>
+                        <td class="table__name">${esc(item.item_name)}</td>
+                        <td>${rack}</td>
+                        <td class="table__num table__stock">${esc(item.quantity)}</td>
+                        <td><span class="chip" data-tone="${tone}">${label}</span></td>
+                    </tr>`;
+            }).join('');
         }
 
         document.addEventListener('DOMContentLoaded', async () => {

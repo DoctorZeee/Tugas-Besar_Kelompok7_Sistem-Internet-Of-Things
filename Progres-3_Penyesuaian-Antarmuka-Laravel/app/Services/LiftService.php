@@ -129,7 +129,8 @@ class LiftService
 
     private function publish(string $topic, string $payload): void
     {
-        // QoS 0, tanpa retain: firmware mengabaikan pesan retained dan hanya subscribe QoS 0.
-        MQTT::publish($topic, $payload, 0, false);
+        // Signature facade: publish($topic, $message, $retain = false, $connection = null).
+        // Default-nya QoS 0 tanpa retain: firmware mengabaikan pesan retained dan hanya subscribe QoS 0.
+        MQTT::publish($topic, $payload);
     }
 }
