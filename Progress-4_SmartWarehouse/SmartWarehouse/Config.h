@@ -17,9 +17,9 @@
 #define FEATURE_LOOP_WATCHDOG 1   // reset ESP32 bila loop() macet (mencegah motor jalan tanpa kontrol)
 
 // ---------- WIFI & MQTT ----------
-const char* const WIFI_SSID     = "Tamu Kost";
-const char* const WIFI_PASSWORD = "diono123";
-const char* const MQTT_BROKER   = "b10b628edde04465b095d96794a7d0b1.s1.eu.hivemq.cloud";   // HiveMQ Cloud
+const char* const WIFI_SSID     = "Nama_WiFi_Kamu";
+const char* const WIFI_PASSWORD = "Password_WiFi_Kamu";
+const char* const MQTT_BROKER   = "ISI_ALAMAT_CLUSTER.s1.eu.hivemq.cloud";   // HiveMQ Cloud
 const int         MQTT_PORT     = 8883;   // 8883 = MQTT-TLS (ESP32/Laravel). 8884 = WebSocket untuk browser, JANGAN dipakai di ESP32
 
 const char* const MQTT_TOPIC_COMMAND   = "kelompok7/smartwarehouse/lift/command";
@@ -64,8 +64,8 @@ mRGunUHBcnWEvgJBQl9nJEiU0Zsnvgc/ubhPgXRR4Xq37Z0j4r7g1SgEEzwxA57d
 emyPxgcYxn/eR44/KJ4EBs+lVDR3veyJm+kXQ99b21/+jh5Xos1AnX5iItreGCc=
 -----END CERTIFICATE-----)";
 // Login broker (kosong = anonim).
-const char* const MQTT_USER     = "KelompokIoT_Tubes";
-const char* const MQTT_PASSWORD = "Rafif12#$";   // jangan commit ke repositori publik
+const char* const MQTT_USER     = "ISI_USERNAME_MQTT";
+const char* const MQTT_PASSWORD = "ISI_PASSWORD_MQTT";   // isi sendiri; jangan commit nilai asli
 
 // ---------- ADMIN (dikendalikan dari Laravel lewat MQTT) ----------
 // Perintah yang diterima di topik admin/command (teks biasa): ACK_ERROR, STATUS, CANCEL_CAL,
