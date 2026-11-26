@@ -1,9 +1,42 @@
-//
+const THEME_KEY = 'smart-warehouse-theme';
+const THEME_COLORS = { light: '#f4f7fb', dark: '#0b1220' };
+const root = document.documentElement;
 
-/**
- * Echo exposes an expressive API for subscribing to channels and listening
- * for events that are broadcast by Laravel. Echo and event broadcasting
- * allow your team to quickly build robust real-time web applications.
- */
+function getTheme() {
+    return root.dataset.theme === 'dark' ? 'dark' : 'light';
+}
 
-import './echo';
+function updateThemeControls(theme) {
+    document.querySelectorAll('[data-theme-toggle]').forEach((button) => {
+        const nextTheme = theme === 'dark' ? 'terang' : 'gelap';
+
+        button.setAttribute('aria-label', `Ubah ke mode ${nextTheme}`);
+        button.setAttribute('title', `Ubah ke mode ${nextTheme}`);
+    });
+}
+
+function setTheme(theme, persist = true) {
+    const nextTheme = theme === 'dark' ? 'dark' : 'light';
+    root.dataset.theme = nextTheme;
+
+    if (persist) {
+        try {
+            localStorage.setItem(THEME_KEY, nextTheme);
+        } catch (_) {
+            // Theme tetap berubah untuk sesi ini ketika storage tidak tersedia.
+        }
+    }
+
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', THEME_COLORS[nextTheme]);
+    updateThemeControls(nextTheme);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    updateThemeControls(getTheme());
+
+    document.querySelectorAll('[data-theme-toggle]').forEach((button) => {
+        button.addEventListener('click', () => {
+            setTheme(getTheme() === 'dark' ? 'light' : 'dark');
+        });
+    });
+});

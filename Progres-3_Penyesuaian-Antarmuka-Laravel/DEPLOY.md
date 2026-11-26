@@ -8,8 +8,10 @@ php artisan key:generate
 php artisan migrate:fresh --seed   # migrasi diubah (stock_movements, lift_commands, anomaly_logs, users.role): wajib fresh sekali
 npm ci && npm run build
 ```
-Production: `APP_ENV=production`, `APP_DEBUG=false`, `APP_URL=https://...`, `REVERB_SCHEME=https`, `SESSION_SECURE_COOKIE=true`.
+Production: `APP_ENV=production`, `APP_DEBUG=false`, `APP_URL=https://...`, `REVERB_SCHEME=https`, `REVERB_ALLOWED_ORIGINS=domain-dashboard-anda`, `SESSION_SECURE_COOKIE=true`. Samakan `VITE_REVERB_*` dengan endpoint Reverb yang dapat dijangkau browser, lalu jalankan ulang `npm run build` setelah mengubah nilainya.
 Lalu `php artisan config:cache route:cache view:cache`.
+
+Pastikan `MQTT_HOST`, `MQTT_AUTH_USERNAME`, dan `MQTT_AUTH_PASSWORD` memakai akun broker Laravel tersendiri. Aktifkan validasi sertifikat TLS (`MQTT_TLS_VERIFY_PEER=true` dan `MQTT_TLS_VERIFY_PEER_NAME=true`); isi `MQTT_TLS_CA_FILE` hanya bila CA broker tidak tersedia di trust store sistem. Akun `ADMIN_*` dan `OPERATOR_*` dibuat saat `db:seed`; password tidak disediakan secara default.
 
 ## 2. Dua proses yang harus selalu hidup (pakai Supervisor/systemd)
 - `php artisan mqtt:listen`  — menerima telemetri ESP32, menutup status perintah, broadcast ke dashboard

@@ -18,7 +18,10 @@ class LiftController extends Controller
     {
         $t = $this->lift->telemetry();
         if ($t) {
+            $age = now()->timestamp - (int) ($t['received_at'] ?? 0);
             $t['is_locked'] = $this->lift->isLocked();
+            $t['telemetry_age_limit'] = (int) config('warehouse.telemetry_max_age', 15);
+            $t['is_stale'] = $age > $t['telemetry_age_limit'];
         }
 
         return response()->json($t ?? ['state' => 'OFFLINE', 'info' => 'Belum ada telemetri']);
